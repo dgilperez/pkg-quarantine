@@ -1,0 +1,67 @@
+{
+  "name": "pkg-quarantine",
+  "version": "0.1.0",
+  "description": "Unified quarantine policy for package managers — block recently-published packages to prevent supply-chain attacks",
+  "type": "module",
+  "bin": {
+    "quarantine": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "security",
+    "supply-chain",
+    "quarantine",
+    "npm",
+    "pnpm",
+    "bun",
+    "yarn",
+    "deno",
+    "pip",
+    "uv",
+    "gem",
+    "composer",
+    "go",
+    "brew",
+    "package-manager"
+  ],
+  "author": "David Gil <dgilperez@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dgilperez/pkg-quarantine.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dgilperez/pkg-quarantine/issues"
+  },
+  "homepage": "https://github.com/dgilperez/pkg-quarantine#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "commander": "13.1.0",
+    "@iarna/toml": "2.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "tsup": "8.4.0",
+    "typescript": "5.8.3",
+    "vitest": "3.1.2"
+  }
+}
