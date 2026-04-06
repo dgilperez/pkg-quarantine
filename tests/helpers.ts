@@ -22,10 +22,18 @@ type WhichHandler = (cmd: string) => string | null;
 export function mockShell(opts: {
   installed?: string[];
   exec?: ExecHandler;
+  npmVersion?: string;
 } = {}): Shell {
   const installed = new Set(opts.installed ?? []);
+  const npmVersion = opts.npmVersion ?? '10.2.3';
+  const defaultExec: ExecHandler = (cmd, args) => {
+    if (cmd === 'npm' && args.includes('--version')) {
+      return { stdout: npmVersion, stderr: '', exitCode: 0 };
+    }
+    return { stdout: '', stderr: '', exitCode: 0 };
+  };
   return {
-    exec: opts.exec ?? (() => ({ stdout: '', stderr: '', exitCode: 0 })),
+    exec: opts.exec ?? defaultExec,
     which(cmd: string) {
       return installed.has(cmd) ? `/usr/bin/${cmd}` : null;
     },

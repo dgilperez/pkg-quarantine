@@ -1,7 +1,10 @@
 import { ManagerHandler } from './base.js';
 import { paths } from '../lib/platform.js';
 import { parseNpmrc, mergeNpmrc } from '../config/npmrc.js';
-import type { DesiredSetting, AuditCheck, OutdatedPackage } from '../types.js';
+import type { DesiredSetting, AuditCheck, AuditResult, OutdatedPackage } from '../types.js';
+
+/** Minimum npm major version where min-release-age is reliably supported. */
+const MIN_SUPPORTED_MAJOR = 10;
 
 export class NpmHandler extends ManagerHandler {
   readonly name = 'npm' as const;
@@ -60,6 +63,45 @@ export class NpmHandler extends ManagerHandler {
     } catch {
       return [];
     }
+  }
+
+  /** Override audit to append an npm version compatibility check. */
+  override async audit(): Promise<AuditResult> {
+    const base = await super.audit();
+    const compatCheck = this.versionCompatCheck();
+    if (compatCheck) {
+      base.checks.push(compatCheck);
+    }
+    return base;
+  }
+
+  /** Return a compatibility AuditCheck for the installed npm version, or null if npm not found. */
+  private versionCompatCheck(): AuditCheck | null {
+    if (!this.isInstalled()) return null;
+
+    const result = this.shell.exec('npm', ['--version']);
+    const raw = result.stdout.trim();
+    const major = parseInt(raw.split('.')[0], 10);
+
+    if (isNaN(major) || major < MIN_SUPPORTED_MAJOR) {
+      const versionLabel = isNaN(major) ? `unknown (${raw})` : raw;
+      return {
+        key: 'npm-version-compat',
+        expected: `>=${MIN_SUPPORTED_MAJOR}`,
+        actual: raw || null,
+        status: 'warn',
+        message:
+          `npm ${versionLabel} has known issues with min-release-age and --before flag interactions. ` +
+          `Upgrade to npm ${MIN_SUPPORTED_MAJOR}+ for reliable quarantine support: npm install -g npm@latest`,
+      };
+    }
+
+    return {
+      key: 'npm-version-compat',
+      expected: `>=${MIN_SUPPORTED_MAJOR}`,
+      actual: raw,
+      status: 'ok',
+    };
   }
 
   protected auditConfig(content: string | null): AuditCheck[] {

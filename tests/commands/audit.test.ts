@@ -18,7 +18,7 @@ describe('audit command', () => {
     });
 
     const output = logs.join('\n');
-    expect(output).toContain('3 passed');
+    expect(output).toContain('4 passed');
     // Verify specific keys are checked
     expect(output).toContain('min-release-age');
     expect(output).toContain('ignore-scripts');

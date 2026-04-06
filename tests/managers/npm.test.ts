@@ -12,11 +12,14 @@ function mockFs(files: Record<string, string> = {}): FileSystem {
   };
 }
 
-function mockShell(outdatedJson = '{}'): Shell {
+function mockShell(outdatedJson = '{}', npmVersion = '10.2.3'): Shell {
   return {
     exec(_cmd: string, args: string[]): ShellResult {
       if (args.includes('outdated')) {
         return { stdout: outdatedJson, stderr: '', exitCode: outdatedJson === '{}' ? 0 : 1 };
+      }
+      if (args.includes('--version')) {
+        return { stdout: npmVersion, stderr: '', exitCode: 0 };
       }
       return { stdout: '', stderr: '', exitCode: 0 };
     },
@@ -69,7 +72,9 @@ describe('NpmHandler', () => {
   it('audits missing config', async () => {
     const handler = new NpmHandler(mockFs(), mockShell(), 4);
     const result = await handler.audit();
-    expect(result.checks.every((c) => c.status === 'missing')).toBe(true);
+    // config checks are missing; compat check may be ok or warn
+    const configChecks = result.checks.filter((c) => c.key !== 'npm-version-compat');
+    expect(configChecks.every((c) => c.status === 'missing')).toBe(true);
   });
 
   it('audits correct config', async () => {
@@ -77,7 +82,8 @@ describe('NpmHandler', () => {
     const fs = mockFs({ [new NpmHandler(mockFs(), mockShell(), 4).configPath]: npmrc });
     const handler = new NpmHandler(fs, mockShell(), 4);
     const result = await handler.audit();
-    expect(result.checks.every((c) => c.status === 'ok')).toBe(true);
+    const configChecks = result.checks.filter((c) => c.key !== 'npm-version-compat');
+    expect(configChecks.every((c) => c.status === 'ok')).toBe(true);
   });
 
   it('audits incorrect values', async () => {
@@ -85,7 +91,68 @@ describe('NpmHandler', () => {
     const fs = mockFs({ [new NpmHandler(mockFs(), mockShell(), 4).configPath]: npmrc });
     const handler = new NpmHandler(fs, mockShell(), 4);
     const result = await handler.audit();
-    expect(result.checks.filter((c) => c.status === 'warn')).toHaveLength(2);
-    expect(result.checks.filter((c) => c.status === 'missing')).toHaveLength(1);
+    const configChecks = result.checks.filter((c) => c.key !== 'npm-version-compat');
+    expect(configChecks.filter((c) => c.status === 'warn')).toHaveLength(2);
+    expect(configChecks.filter((c) => c.status === 'missing')).toHaveLength(1);
+  });
+
+  describe('npm version compatibility check', () => {
+    it('passes for npm 10+', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '10.2.3'), 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      expect(compat).toBeDefined();
+      expect(compat!.status).toBe('ok');
+    });
+
+    it('warns for npm 9.x', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '9.8.1'), 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      expect(compat).toBeDefined();
+      expect(compat!.status).toBe('warn');
+      expect(compat!.message).toContain('10');
+    });
+
+    it('warns for npm 8.x', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '8.19.4'), 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      expect(compat!.status).toBe('warn');
+    });
+
+    it('warns about --before conflicts when npm version is old', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '9.5.0'), 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      expect(compat!.message).toMatch(/--before|before/i);
+    });
+
+    it('handles version parse failure gracefully', async () => {
+      const badShell: Shell = {
+        exec(_cmd, args): ShellResult {
+          if (args.includes('--version')) return { stdout: 'not-semver', stderr: '', exitCode: 0 };
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        },
+        which() { return '/usr/bin/npm'; },
+      };
+      const handler = new NpmHandler(mockFs(), badShell, 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      // Unknown version — should warn, not crash
+      expect(compat).toBeDefined();
+      expect(compat!.status).toBe('warn');
+    });
+
+    it('skips version check when npm is not installed', async () => {
+      const noNpmShell: Shell = {
+        exec(): ShellResult { return { stdout: '', stderr: '', exitCode: 1 }; },
+        which() { return null; },
+      };
+      const handler = new NpmHandler(mockFs(), noNpmShell, 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      expect(compat).toBeUndefined();
+    });
   });
 });
