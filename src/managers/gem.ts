@@ -1,11 +1,11 @@
 import { ManagerHandler } from './base.js';
 import { paths } from '../lib/platform.js';
-import type { DesiredSetting, AuditCheck, OutdatedPackage } from '../types.js';
+import type { DesiredSetting, AuditCheck, AuditResult, OutdatedPackage } from '../types.js';
 
 export class GemHandler extends ManagerHandler {
   readonly name = 'gem' as const;
   readonly displayName = 'RubyGems';
-  readonly configPath = paths.gemrc;
+  readonly configPath = paths.bundleConfig;
 
   getDesiredSettings(): DesiredSetting[] {
     return [
@@ -18,16 +18,12 @@ export class GemHandler extends ManagerHandler {
   }
 
   async mergeConfig(dryRun: boolean): Promise<{ path: string; content: string; changed: boolean }> {
-    // gem has two config files: ~/.gemrc (YAML) and ~/.bundle/config (YAML)
-    // We handle ~/.bundle/config for trust policy
-    const bundlePath = paths.bundleConfig;
-    const existing = (await this.fs.readFile(bundlePath)) ?? '';
+    const existing = (await this.fs.readFile(this.configPath)) ?? '';
 
     let changed = false;
     let content = existing;
 
     if (!existing.includes('BUNDLE_TRUST___POLICY')) {
-      // Append to bundle config
       if (existing && !existing.endsWith('\n')) content += '\n';
       if (!existing.includes('---')) content = '---\n' + content;
       content += 'BUNDLE_TRUST___POLICY: "MediumSecurity"\n';
@@ -35,10 +31,10 @@ export class GemHandler extends ManagerHandler {
     }
 
     if (!dryRun && changed) {
-      await this.fs.writeFile(bundlePath, content);
+      await this.fs.writeFile(this.configPath, content);
     }
 
-    return { path: bundlePath, content, changed };
+    return { path: this.configPath, content, changed };
   }
 
   getOutdated(): OutdatedPackage[] {
@@ -56,23 +52,11 @@ export class GemHandler extends ManagerHandler {
       });
   }
 
-  protected auditConfig(_content: string | null): AuditCheck[] {
-    // Check bundle config instead of gemrc for trust policy
-    // We use a synchronous approach — the async audit() method handles the read
-    return [{
-      key: 'BUNDLE_TRUST___POLICY',
-      expected: 'MediumSecurity',
-      actual: null,
-      status: 'warn',
-      message: 'Check ~/.bundle/config manually',
-    }];
-  }
-
   override async audit(): Promise<AuditResult> {
-    const bundleContent = await this.fs.readFile(paths.bundleConfig);
-    const hasTrustPolicy = bundleContent?.includes('BUNDLE_TRUST___POLICY') ?? false;
+    const content = await this.fs.readFile(this.configPath);
+    const hasTrustPolicy = content?.includes('BUNDLE_TRUST___POLICY') ?? false;
     const actualValue = hasTrustPolicy
-      ? bundleContent!.match(/BUNDLE_TRUST___POLICY:\s*"?(\w+)"?/)?.[1] ?? null
+      ? content!.match(/BUNDLE_TRUST___POLICY:\s*"?(\w+)"?/)?.[1] ?? null
       : null;
 
     return {
@@ -86,7 +70,9 @@ export class GemHandler extends ManagerHandler {
       }],
     };
   }
-}
 
-// Import for the override return type
-import type { AuditResult } from '../types.js';
+  protected auditConfig(_content: string | null): AuditCheck[] {
+    // Not used — audit() is overridden. Required by abstract base.
+    return [];
+  }
+}

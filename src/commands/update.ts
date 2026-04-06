@@ -148,10 +148,14 @@ async function installPackages(
       cmd = 'npm'; args = ['install', '-g', ...specs]; break;
     case 'pnpm':
       cmd = 'pnpm'; args = ['add', '-g', ...specs]; break;
+    case 'bun':
+      cmd = 'bun'; args = ['add', '-g', ...specs]; break;
     case 'pip':
       cmd = 'pip3'; args = ['install', '--upgrade', ...specs]; break;
     case 'gem':
       cmd = 'gem'; args = ['update', ...specs]; break;
+    case 'cargo':
+      cmd = 'cargo'; args = ['install', ...specs.map(s => s.replace(/@.*/, ''))]; break;
     default:
       output.warn(`No install command defined for ${manager}`);
       return;

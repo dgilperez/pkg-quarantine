@@ -1,6 +1,6 @@
 import { ManagerHandler } from './base.js';
 import { paths } from '../lib/platform.js';
-import { parsePipConf, serializePipConf } from '../config/file-parsers.js';
+import { parsePipConf, mergePipConf } from '../config/file-parsers.js';
 import type { DesiredSetting, AuditCheck, OutdatedPackage } from '../types.js';
 
 export class PipHandler extends ManagerHandler {
@@ -24,13 +24,7 @@ export class PipHandler extends ManagerHandler {
 
   async mergeConfig(dryRun: boolean): Promise<{ path: string; content: string; changed: boolean }> {
     const existing = (await this.fs.readFile(this.configPath)) ?? '';
-    const sections = existing ? parsePipConf(existing) : new Map([['global', new Map<string, string>()]]);
-
-    if (!sections.has('global')) sections.set('global', new Map());
-    const global = sections.get('global')!;
-    global.set('only-binary', ':all:');
-
-    const merged = serializePipConf(sections);
+    const merged = mergePipConf(existing, 'global', { 'only-binary': ':all:' });
     const changed = merged !== existing;
 
     if (!dryRun && changed) {
@@ -69,9 +63,9 @@ export class PipHandler extends ManagerHandler {
       }];
     }
 
-    const sections = parsePipConf(content);
-    const global = sections.get('global');
-    const actual = global?.get('only-binary') ?? null;
+    const parsed = parsePipConf(content);
+    const global = parsed.sections.get('global');
+    const actual = global?.get('only-binary')?.value ?? null;
 
     return [{
       key: 'only-binary',

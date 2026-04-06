@@ -1,6 +1,6 @@
 import { ManagerHandler } from './base.js';
 import { paths } from '../lib/platform.js';
-import { parseIni, serializeIni } from '../config/file-parsers.js';
+import { parseIni, mergeIni } from '../config/file-parsers.js';
 import type { DesiredSetting, AuditCheck, OutdatedPackage } from '../types.js';
 
 export class PnpmHandler extends ManagerHandler {
@@ -30,13 +30,11 @@ export class PnpmHandler extends ManagerHandler {
 
   async mergeConfig(dryRun: boolean): Promise<{ path: string; content: string; changed: boolean }> {
     const existing = (await this.fs.readFile(this.configPath)) ?? '';
-    const map = parseIni(existing);
-
+    const settings: Record<string, string> = {};
     for (const s of this.getDesiredSettings()) {
-      map.set(s.key, s.value);
+      settings[s.key] = s.value;
     }
-
-    const merged = serializeIni(map);
+    const merged = mergeIni(existing, settings);
     const changed = merged !== existing;
 
     if (!dryRun && changed) {
@@ -74,7 +72,7 @@ export class PnpmHandler extends ManagerHandler {
 
     const parsed = parseIni(content);
     return this.getDesiredSettings().map((s) => {
-      const actual = parsed.get(s.key) ?? null;
+      const actual = parsed.settings.get(s.key) ?? null;
       const status = actual === s.value ? 'ok' : actual === null ? 'missing' : 'warn';
       return {
         key: s.key, expected: s.value, actual, status,
