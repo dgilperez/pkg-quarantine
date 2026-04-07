@@ -12,7 +12,7 @@ function mockFs(files: Record<string, string> = {}): FileSystem {
   };
 }
 
-function mockShell(outdatedJson = '{}', npmVersion = '10.2.3'): Shell {
+function mockShell(outdatedJson = '{}', npmVersion = '11.10.0'): Shell {
   return {
     exec(_cmd: string, args: string[]): ShellResult {
       if (args.includes('outdated')) {
@@ -97,21 +97,63 @@ describe('NpmHandler', () => {
   });
 
   describe('npm version compatibility check', () => {
-    it('passes for npm 10+', async () => {
-      const handler = new NpmHandler(mockFs(), mockShell('{}', '10.2.3'), 4);
+    // min-release-age was added in npm 11.10.0 (Feb 2026).
+    // Earlier versions silently ignore the .npmrc setting, leaving the user
+    // unprotected — the worst possible outcome for a security tool. The compat
+    // check exists specifically to prevent that false-OK.
+
+    it('passes for npm 11.10.0', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '11.10.0'), 4);
       const result = await handler.audit();
       const compat = result.checks.find((c) => c.key === 'npm-version-compat');
       expect(compat).toBeDefined();
       expect(compat!.status).toBe('ok');
     });
 
-    it('warns for npm 9.x', async () => {
-      const handler = new NpmHandler(mockFs(), mockShell('{}', '9.8.1'), 4);
+    it('passes for npm 11.10.5', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '11.10.5'), 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      expect(compat!.status).toBe('ok');
+    });
+
+    it('passes for npm 12.0.0', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '12.0.0'), 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      expect(compat!.status).toBe('ok');
+    });
+
+    it('warns for npm 11.5.1 (min-release-age silently ignored)', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '11.5.1'), 4);
       const result = await handler.audit();
       const compat = result.checks.find((c) => c.key === 'npm-version-compat');
       expect(compat).toBeDefined();
       expect(compat!.status).toBe('warn');
-      expect(compat!.message).toContain('10');
+      expect(compat!.message).toContain('11.10');
+    });
+
+    it('warns for npm 11.9.9 (last version before min-release-age shipped)', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '11.9.9'), 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      expect(compat!.status).toBe('warn');
+      expect(compat!.message).toContain('11.10');
+    });
+
+    it('warns for npm 10.2.3', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '10.2.3'), 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      expect(compat!.status).toBe('warn');
+      expect(compat!.message).toContain('11.10');
+    });
+
+    it('warns for npm 9.x', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '9.8.1'), 4);
+      const result = await handler.audit();
+      const compat = result.checks.find((c) => c.key === 'npm-version-compat');
+      expect(compat!.status).toBe('warn');
     });
 
     it('warns for npm 8.x', async () => {
@@ -121,11 +163,11 @@ describe('NpmHandler', () => {
       expect(compat!.status).toBe('warn');
     });
 
-    it('warns about --before conflicts when npm version is old', async () => {
-      const handler = new NpmHandler(mockFs(), mockShell('{}', '9.5.0'), 4);
+    it('upgrade message points to npm@latest', async () => {
+      const handler = new NpmHandler(mockFs(), mockShell('{}', '11.5.1'), 4);
       const result = await handler.audit();
       const compat = result.checks.find((c) => c.key === 'npm-version-compat');
-      expect(compat!.message).toMatch(/--before|before/i);
+      expect(compat!.message).toMatch(/npm install -g npm@latest/);
     });
 
     it('handles version parse failure gracefully', async () => {

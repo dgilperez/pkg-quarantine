@@ -3,8 +3,16 @@ import { paths } from '../lib/platform.js';
 import { parseNpmrc, mergeNpmrc } from '../config/npmrc.js';
 import type { DesiredSetting, AuditCheck, AuditResult, OutdatedPackage } from '../types.js';
 
-/** Minimum npm major version where min-release-age is reliably supported. */
-const MIN_SUPPORTED_MAJOR = 10;
+/**
+ * Minimum npm version where `min-release-age` is honored.
+ *
+ * The setting shipped in npm 11.10.0 (Feb 2026, see
+ * https://socket.dev/blog/npm-introduces-minimumreleaseage-and-bulk-oidc-configuration).
+ * Earlier npm versions accept the key in `.npmrc` but silently ignore it AND
+ * emit a deprecation warning, so installs proceed unprotected. The compat
+ * check exists specifically to surface that false-OK to the user.
+ */
+const MIN_NPM_VERSION = { major: 11, minor: 10, patch: 0 } as const;
 
 export class NpmHandler extends ManagerHandler {
   readonly name = 'npm' as const;
@@ -81,24 +89,40 @@ export class NpmHandler extends ManagerHandler {
 
     const result = this.shell.exec('npm', ['--version']);
     const raw = result.stdout.trim();
-    const major = parseInt(raw.split('.')[0], 10);
+    const min = MIN_NPM_VERSION;
+    const expected = `>=${min.major}.${min.minor}.${min.patch}`;
+    const parsed = parseSemver(raw);
 
-    if (isNaN(major) || major < MIN_SUPPORTED_MAJOR) {
-      const versionLabel = isNaN(major) ? `unknown (${raw})` : raw;
+    if (!parsed) {
       return {
         key: 'npm-version-compat',
-        expected: `>=${MIN_SUPPORTED_MAJOR}`,
+        expected,
         actual: raw || null,
         status: 'warn',
         message:
-          `npm ${versionLabel} has known issues with min-release-age and --before flag interactions. ` +
-          `Upgrade to npm ${MIN_SUPPORTED_MAJOR}+ for reliable quarantine support: npm install -g npm@latest`,
+          `Could not parse npm version "${raw}". ` +
+          `min-release-age requires npm >=${min.major}.${min.minor}.${min.patch}. ` +
+          `Upgrade with: npm install -g npm@latest`,
+      };
+    }
+
+    if (compareSemver(parsed, min) < 0) {
+      return {
+        key: 'npm-version-compat',
+        expected,
+        actual: raw,
+        status: 'warn',
+        message:
+          `npm ${raw} silently ignores the \`min-release-age\` setting — ` +
+          `it shipped in npm ${min.major}.${min.minor}.${min.patch} (Feb 2026). ` +
+          `Until you upgrade, the npm quarantine is NOT enforced. ` +
+          `Upgrade with: npm install -g npm@latest`,
       };
     }
 
     return {
       key: 'npm-version-compat',
-      expected: `>=${MIN_SUPPORTED_MAJOR}`,
+      expected,
       actual: raw,
       status: 'ok',
     };
@@ -128,4 +152,28 @@ export class NpmHandler extends ManagerHandler {
       };
     });
   }
+}
+
+interface SemverParts {
+  major: number;
+  minor: number;
+  patch: number;
+}
+
+/** Parse a `MAJOR.MINOR.PATCH` string. Pre-release/build metadata is ignored. */
+function parseSemver(raw: string): SemverParts | null {
+  const match = raw.match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return null;
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+  };
+}
+
+/** Standard semver compare. Returns <0, 0, or >0. */
+function compareSemver(a: SemverParts, b: SemverParts): number {
+  if (a.major !== b.major) return a.major - b.major;
+  if (a.minor !== b.minor) return a.minor - b.minor;
+  return a.patch - b.patch;
 }

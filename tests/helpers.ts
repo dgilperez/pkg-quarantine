@@ -25,7 +25,7 @@ export function mockShell(opts: {
   npmVersion?: string;
 } = {}): Shell {
   const installed = new Set(opts.installed ?? []);
-  const npmVersion = opts.npmVersion ?? '10.2.3';
+  const npmVersion = opts.npmVersion ?? '11.10.0';
   const defaultExec: ExecHandler = (cmd, args) => {
     if (cmd === 'npm' && args.includes('--version')) {
       return { stdout: npmVersion, stderr: '', exitCode: 0 };
