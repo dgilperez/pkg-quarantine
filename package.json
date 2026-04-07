@@ -4,7 +4,7 @@
   "description": "Unified quarantine policy for package managers — block recently-published packages to prevent supply-chain attacks",
   "type": "module",
   "bin": {
-    "quarantine": "./dist/index.js"
+    "quarantine": "dist/index.js"
   },
   "exports": {
     ".": {
