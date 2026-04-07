@@ -1,14 +1,10 @@
-```
-  ╔══╦══╦══╗   ╔═╗ ╦ ╦╔═╗╦═╗╔═╗╔╗╔╔╦╗╦╔╗╔╔═╗
-  ╠══╬══╬══╣   ║═╬╗║ ║╠═╣╠╦╝╠═╣║║║ ║ ║║║║║╣
-  ╚══╩══╩══╝   ╩ ╩╚╚═╝╩ ╩╩╚═╩ ╩╝╚╝ ╩ ╩╝╚╝╚═╝
+# pkg-quarantine
 
-  [ pkg ]──wait 4 days──>[ install ]  ← supply-chain blocker
-```
+> **\[ pkg \] —— wait 4 days ——> \[ install \]**  ← supply-chain blocker
 
 [![npm version](https://img.shields.io/npm/v/pkg-quarantine)](https://www.npmjs.com/package/pkg-quarantine)
-[![license](https://img.shields.io/npm/l/pkg-quarantine)](LICENSE)
-[![node](https://img.shields.io/node/v/pkg-quarantine)](package.json)
+[![license](https://img.shields.io/npm/l/pkg-quarantine)](https://github.com/dgilperez/pkg-quarantine/blob/master/LICENSE)
+[![node](https://img.shields.io/node/v/pkg-quarantine)](https://github.com/dgilperez/pkg-quarantine/blob/master/package.json)
 
 **Block freshly-published packages before they reach your machine.**
 
@@ -111,14 +107,17 @@ Add this to your `CLAUDE.md` (or equivalent agent instructions file):
 ```markdown
 ## Package Security
 
-A 4-day quarantine policy is enforced across all package managers via pkg-quarantine.
-This blocks installation of any package version published less than 4 days ago.
+A 4-day quarantine policy is enforced via pkg-quarantine.
+Versions published less than 4 days ago will not install.
 
 Rules:
-- Never run bare `npm install -g <pkg>@latest` — use `quarantine update` instead.
-- Before manually installing an unfamiliar package, check its publish date.
-- If a package install fails with a quarantine error, report it rather than bypassing it.
-- The quarantine is a safety net, not an obstacle. Work within it.
+- Never run bare `npm install -g <pkg>@latest`.
+  Use `quarantine update` instead.
+- Before installing an unfamiliar package, check its
+  publish date.
+- If an install fails with a quarantine error, report
+  it rather than bypassing it.
+- The quarantine is a safety net, not an obstacle.
 ```
 
 ### Verifying your agent respects it
