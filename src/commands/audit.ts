@@ -8,11 +8,17 @@ export interface AuditOptions {
   config: QuarantineConfig;
 }
 
+export interface AuditTotals {
+  ok: number;
+  warn: number;
+  missing: number;
+}
+
 export async function auditCommand(
   fs: FileSystem,
   shell: Shell,
   options: AuditOptions,
-): Promise<void> {
+): Promise<AuditTotals> {
   const { config } = options;
   const requested = options.managers.length > 0 ? options.managers : config.managers;
 
@@ -67,4 +73,6 @@ export async function auditCommand(
   if (totalMissing > 0) {
     output.info('Run `quarantine init` to fix missing settings');
   }
+
+  return { ok: totalOk, warn: totalWarn, missing: totalMissing };
 }

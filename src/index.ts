@@ -36,7 +36,7 @@ const program = new Command();
 program
   .name('quarantine')
   .description('Unified quarantine policy for package managers')
-  .version('0.1.0');
+  .version('0.1.1');
 
 program
   .command('init')
@@ -58,12 +58,16 @@ program
   .command('audit')
   .description('Traffic-light report of quarantine config status')
   .argument('[managers...]', 'Specific managers to audit')
-  .action(async (managers: string[]) => {
+  .option('--exit-code', 'Exit non-zero if any manager has warnings or missing settings (CI mode)', false)
+  .action(async (managers: string[], opts: { exitCode: boolean }) => {
     const config = await loadConfig();
-    await auditCommand(fs, shell, {
+    const totals = await auditCommand(fs, shell, {
       managers: parseManagers(managers),
       config,
     });
+    if (opts.exitCode && (totals.warn + totals.missing) > 0) {
+      process.exit(1);
+    }
   });
 
 program

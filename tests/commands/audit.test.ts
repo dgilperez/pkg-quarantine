@@ -67,6 +67,78 @@ describe('audit command', () => {
     vi.restoreAllMocks();
   });
 
+  describe('return value (for --exit-code)', () => {
+    it('returns zero counts when fully configured', async () => {
+      const fs = mockFs({
+        [paths.npmrc]: 'min-release-age=4\nignore-scripts=true\naudit-level=high\n',
+      });
+      const shell = mockShell({ installed: ['npm'] });
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      const result = await auditCommand(fs, shell, {
+        managers: ['npm'],
+        config: { quarantine_days: 4, managers: ['npm'] },
+      });
+
+      expect(result.warn).toBe(0);
+      expect(result.missing).toBe(0);
+      expect(result.ok).toBeGreaterThan(0);
+
+      vi.restoreAllMocks();
+    });
+
+    it('reports missing > 0 when no .npmrc exists', async () => {
+      const fs = mockFs();
+      const shell = mockShell({ installed: ['npm'] });
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      const result = await auditCommand(fs, shell, {
+        managers: ['npm'],
+        config: { quarantine_days: 4, managers: ['npm'] },
+      });
+
+      expect(result.missing).toBeGreaterThan(0);
+
+      vi.restoreAllMocks();
+    });
+
+    it('reports warn > 0 when values are wrong', async () => {
+      const fs = mockFs({
+        [paths.npmrc]: 'min-release-age=1\nignore-scripts=false\n',
+      });
+      const shell = mockShell({ installed: ['npm'] });
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      const result = await auditCommand(fs, shell, {
+        managers: ['npm'],
+        config: { quarantine_days: 4, managers: ['npm'] },
+      });
+
+      expect(result.warn).toBeGreaterThan(0);
+
+      vi.restoreAllMocks();
+    });
+
+    it('flags warn when npm is older than 11.10.0 even if config looks right', async () => {
+      const fs = mockFs({
+        [paths.npmrc]: 'min-release-age=4\nignore-scripts=true\naudit-level=high\n',
+      });
+      const shell = mockShell({ installed: ['npm'], npmVersion: '11.5.1' });
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      const result = await auditCommand(fs, shell, {
+        managers: ['npm'],
+        config: { quarantine_days: 4, managers: ['npm'] },
+      });
+
+      // The config keys are all "ok", but the version compat check warns —
+      // so a CI gate using --exit-code should still fail.
+      expect(result.warn).toBeGreaterThan(0);
+
+      vi.restoreAllMocks();
+    });
+  });
+
   it('skips managers that are not installed', async () => {
     const fs = mockFs();
     const shell = mockShell({ installed: [] });
