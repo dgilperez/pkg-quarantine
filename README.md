@@ -12,27 +12,27 @@
 
 **Block freshly-published packages before they reach your machine.**
 
-One command configures a 4-day quarantine across npm, pnpm, bun, uv, pip, gem, composer, go, cargo, and more. Malicious versions of hijacked packages are almost always detected and pulled within 72 hours — a 4-day hold catches the entire window.
+One command configures a release-age cooldown across every supported package manager on your machine. Malicious versions of hijacked packages are typically [detected and pulled within hours to a few days](https://socket.dev/blog/npm-introduces-minimumreleaseage-and-bulk-oidc-configuration) — a 4-day hold sits comfortably outside that window.
 
 ```bash
 npm install -g pkg-quarantine
 quarantine init
 ```
 
-That's it. Every package manager on your machine now silently rejects anything published in the last 4 days.
+That's it. For managers with native release-age support (npm, pnpm, bun, uv, yarn, deno), every install now silently rejects anything published in the last 4 days. For managers without it (pip, gem, composer, cargo, hex), `quarantine update` enforces the same policy at update time.
 
 ---
 
 ## Why this exists
 
-The Axios supply-chain attack (March 2026) injected a remote access trojan via a hijacked maintainer account. The malicious version was live for ~18 hours before detection. It was installed by thousands of CI pipelines and developer machines before anyone noticed.
+The [axios supply-chain compromise](https://www.elastic.co/security-labs/axios-one-rat-to-rule-them-all) (March 31, 2026) injected a cross-platform RAT through a hijacked maintainer account. `axios@1.14.1` shipped at 00:21 UTC; Elastic Security Labs filed an advisory at 01:50 UTC. In the ~90 minutes between publish and disclosure — and the longer window before npm pulled the package — both the `latest` and `legacy` dist-tags pointed at compromised versions, so the majority of fresh installs picked up a backdoored release.
 
 This pattern keeps repeating:
 - Maintainer account compromise → malicious version published
 - Typosquatting → `cros-env` instead of `cross-env`
 - Dependency confusion → private package names published to public registries
 
-**The exploit window is short.** Security teams typically detect and pull malicious packages within 24–72 hours. A 4-day quarantine makes your machine invisible to this entire class of attack.
+**The exploit window is short.** Security teams and automated scanners ([Snyk](https://snyk.io/blog/axios-npm-package-compromised-supply-chain-attack-delivers-cross-platform/), [StepSecurity](https://www.stepsecurity.io/blog/axios-compromised-on-npm-malicious-versions-drop-remote-access-trojan), [Socket](https://socket.dev/blog/npm-introduces-minimumreleaseage-and-bulk-oidc-configuration)) typically detect and pull malicious packages within hours to a few days of publication. A 4-day quarantine puts your machine outside that window for the bulk of supply-chain attacks.
 
 Most package managers have some form of quarantine support — it's just scattered across different formats and options. `pkg-quarantine` configures all of them at once.
 
@@ -75,13 +75,13 @@ One-line-per-manager summary of quarantine posture.
 
 ### `quarantine update`
 
-Quarantine-aware global package updater. Checks each outdated package's publish date against the registry API before upgrading. Won't install anything that's too fresh — even if you ask it to.
+Quarantine-aware global package updater. Checks each outdated package's publish date against the registry API before upgrading. Refuses to install anything that's too fresh unless you pass `--force`.
 
 ```bash
 quarantine update                    # All managers
 quarantine update npm                # Just npm
 quarantine update --dry-run          # Preview without installing
-quarantine update --force            # Bypass quarantine (with warning)
+quarantine update --force            # Bypass quarantine (prints a warning)
 ```
 
 ---
@@ -145,21 +145,43 @@ Add quarantine verification to your CI setup step:
 
 ## Supported managers
 
-| Manager | Quarantine mechanism | What `init` configures |
-|---------|---------------------|----------------------|
-| **npm** | `min-release-age` in ~/.npmrc | `min-release-age`, `ignore-scripts`, `audit-level` |
-| **pnpm** | `minimumReleaseAge` in rc | `minimumReleaseAge` (minutes), `ignore-scripts` |
-| **bun** | `minimumReleaseAge` in bunfig.toml | `install.minimumReleaseAge` (seconds), `frozenLockfile` |
-| **yarn** | `npmMinimalAgeGate` in .yarnrc.yml | Per-project only (prints instructions) |
-| **deno** | `minimumDependencyAge` in deno.json | Per-project only (prints instructions) |
-| **uv** | `exclude-newer` in uv.toml | `exclude-newer = "N days"` |
-| **pip** | Registry API check during update | `only-binary = :all:` |
-| **gem** | Registry API check during update | `BUNDLE_TRUST___POLICY: MediumSecurity` |
-| **composer** | Registry API check during update | `no-scripts`, `allow-plugins={}`, `audit.block-insecure` |
-| **go** | sumdb verification (default) | Verifies sumdb active, recommends govulncheck |
-| **brew** | No native quarantine | Warns about third-party taps |
-| **cargo** | Registry API check during update | Recommends cargo-audit |
-| **hex** | Registry API check during update | Recommends mix_audit |
+`pkg-quarantine` covers 13 package managers, but they fall into three honest tiers depending on what the underlying tool supports.
+
+### Tier 1 — Native install-time quarantine
+
+These managers ship a built-in release-age gate. `init` writes the setting and *every* install (manual or via an AI agent) is automatically protected.
+
+| Manager | Mechanism | Notes |
+|---------|-----------|-------|
+| **npm** | `min-release-age` in `~/.npmrc` | **Requires npm ≥ 11.10.0** (Feb 2026). Earlier versions silently ignore the setting — `quarantine audit` warns. |
+| **pnpm** | `minimumReleaseAge` (minutes) in pnpm rc | — |
+| **bun** | `install.minimumReleaseAge` (seconds) in `bunfig.toml` | — |
+| **uv** | `exclude-newer = "N days"` in `uv.toml` | — |
+| **yarn** | `npmMinimalAgeGate` in `.yarnrc.yml` | Per-project only — `init` prints the snippet to add. |
+| **deno** | `minimumDependencyAge` in `deno.json` | Per-project only — `init` prints the snippet to add. |
+
+### Tier 2 — Update-time quarantine via `quarantine update`
+
+These managers have no native release-age config, so install-time enforcement isn't possible. `quarantine update` checks the registry API before upgrading and refuses fresh versions. Bare `pip install foo` / `gem install foo` / etc. are *not* gated — you must use `quarantine update`.
+
+| Manager | Registry checked | Hardening `init` configures |
+|---------|------------------|------------------------------|
+| **pip** | PyPI JSON API | `only-binary = :all:` (blocks source-build attacks; not a quarantine itself) |
+| **gem** | rubygems.org API | `BUNDLE_TRUST___POLICY: MediumSecurity` |
+| **composer** | packagist API | `no-scripts`, `allow-plugins={}`, `secure-http` |
+| **cargo** | crates.io API | Recommends `cargo-audit` |
+| **hex** | hex.pm API | Recommends `mix_audit` |
+
+> Composer 2.9+ already enables `audit.block-insecure` by default, so `init` no longer writes that setting.
+
+### Tier 3 — Audit and recommendation only
+
+These managers don't have a release-age model at all. `init` prints best-practice recommendations and `audit` reports posture; there is no enforcement.
+
+| Manager | What `init` does |
+|---------|------------------|
+| **go** | Verifies sumdb is active, recommends `govulncheck` |
+| **brew** | Lists third-party taps as a posture warning |
 
 ---
 
