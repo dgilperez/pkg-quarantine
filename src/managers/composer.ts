@@ -9,11 +9,15 @@ export class ComposerHandler extends ManagerHandler {
   readonly configPath = paths.composerConfig;
 
   getDesiredSettings(): DesiredSetting[] {
+    // Note: `audit.block-insecure` is intentionally NOT set here.
+    // Composer 2.9+ enables it by default, and the setting cannot be applied
+    // via `~/.config/composer/config.json` reliably (it lives under `config`
+    // but is gated to per-project composer.json in older Composer versions).
+    // See https://github.com/composer/composer/issues/12611.
     return [
       { key: 'config.no-scripts', value: 'true', description: 'Disable post-install scripts' },
       { key: 'config.allow-plugins', value: '{}', description: 'Block all plugins by default' },
       { key: 'config.secure-http', value: 'true', description: 'Require HTTPS for downloads' },
-      { key: 'config.audit.block-insecure', value: 'true', description: 'Block packages with known vulnerabilities' },
     ];
   }
 
@@ -28,7 +32,6 @@ export class ComposerHandler extends ManagerHandler {
       config: {
         'secure-http': true,
         'allow-plugins': {},
-        'audit': { 'block-insecure': true },
         'no-scripts': true,
       },
     };
@@ -72,13 +75,6 @@ export class ComposerHandler extends ManagerHandler {
             ? 'ok' : config['allow-plugins'] != null ? 'warn' : 'missing',
         },
         checkBool(config, 'secure-http', true),
-        {
-          key: 'config.audit.block-insecure',
-          expected: 'true',
-          actual: String((config['audit'] as Record<string, unknown> | undefined)?.['block-insecure'] ?? null),
-          status: (config['audit'] as Record<string, unknown> | undefined)?.['block-insecure'] === true
-            ? 'ok' : 'missing',
-        },
       ];
     } catch {
       return [{

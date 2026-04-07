@@ -20,9 +20,17 @@ describe('ComposerHandler', () => {
     // New settings added
     expect(parsed.config['no-scripts']).toBe(true);
     expect(parsed.config['secure-http']).toBe(true);
-    expect(parsed.config.audit['block-insecure']).toBe(true);
     // Existing settings preserved
     expect(parsed.config['process-timeout']).toBe(300);
+  });
+
+  it('does NOT write audit.block-insecure (Composer 2.9+ default)', async () => {
+    const handler = new ComposerHandler(mockFs(), mockShell({ installed: ['composer'] }), 4);
+    const result = await handler.mergeConfig(false);
+    const parsed = JSON.parse(result.content);
+    // We deliberately do not touch audit.block-insecure — Composer 2.9+ has it on by default,
+    // and global config.json does not reliably propagate it. See composer/composer#12611.
+    expect(parsed.config.audit).toBeUndefined();
   });
 
   it('creates config from scratch', async () => {
@@ -38,7 +46,6 @@ describe('ComposerHandler', () => {
       config: {
         'secure-http': true,
         'allow-plugins': {},
-        'audit': { 'block-insecure': true },
         'no-scripts': true,
       },
     });
