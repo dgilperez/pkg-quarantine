@@ -36,7 +36,7 @@ const program = new Command();
 program
   .name('quarantine')
   .description('Unified quarantine policy for package managers')
-  .version('0.1.1');
+  .version('0.1.2');
 
 program
   .command('init')
