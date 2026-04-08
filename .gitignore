@@ -3,3 +3,6 @@ dist/
 *.tgz
 coverage/
 .DS_Store
+.playwright-mcp
+.launch/
+launch.toml
