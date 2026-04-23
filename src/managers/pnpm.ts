@@ -8,7 +8,7 @@ export class PnpmHandler extends ManagerHandler {
   readonly displayName = 'pnpm';
   readonly configPath = paths.pnpmrc;
 
-  /** pnpm uses minutes for minimumReleaseAge */
+  /** pnpm uses minutes for minimum-release-age */
   private get quarantineMinutes(): number {
     return this.quarantineDays * 24 * 60;
   }
@@ -16,7 +16,10 @@ export class PnpmHandler extends ManagerHandler {
   getDesiredSettings(): DesiredSetting[] {
     return [
       {
-        key: 'minimumReleaseAge',
+        // pnpm only honours the kebab-case form here. The camelCase
+        // alias appears in `pnpm config list` but is silently ignored
+        // at resolution time — writing it disables quarantine.
+        key: 'minimum-release-age',
         value: String(this.quarantineMinutes),
         description: `Block packages published less than ${this.quarantineDays} days ago (${this.quarantineMinutes} minutes)`,
       },

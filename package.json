@@ -1,6 +1,6 @@
 {
   "name": "pkg-quarantine",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Unified quarantine policy for package managers — block recently-published packages to prevent supply-chain attacks",
   "type": "module",
   "bin": {

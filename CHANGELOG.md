@@ -6,6 +6,39 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-04-23
+
+### Fixed
+
+- **Critical: pnpm quarantine was silently ineffective on macOS.** Two
+  independent bugs cancelled each other's symptoms so `quarantine audit`
+  reported green while pnpm continued to install fresh packages.
+  - **Wrong config path on macOS.** pnpm follows Apple's preferences
+    convention — its global rc lives at `~/Library/Preferences/pnpm/rc`
+    on darwin (see pnpm's own `getConfigDir`), *not* the XDG
+    `~/.config/pnpm/rc` this tool was writing to. pnpm silently ignored
+    the file. Linux users with XDG-style paths were unaffected.
+  - **Wrong setting key.** Previous versions wrote `minimumReleaseAge`
+    (camelCase). That alias is accepted by `pnpm config list` but is
+    *not* applied during install resolution — only the kebab-case
+    `minimum-release-age` actually gates installs. Reproduce on any
+    platform by placing the camelCase form in the correct rc file and
+    running `pnpm add <pkg>@<fresh-version>`: install proceeds.
+- `paths.pnpmrc` now mirrors pnpm's own platform branches (XDG →
+  macOS → POSIX → Windows) instead of assuming XDG everywhere.
+- `quarantine audit pnpm` now flags legacy `minimumReleaseAge` entries
+  as `missing` so anyone upgrading from 0.1.3 gets a warning at audit
+  time instead of silent non-protection.
+
+### Migration
+
+If you ran `quarantine init` on macOS with 0.1.3 or earlier:
+
+1. `quarantine init pnpm` to write the correct config (new path + key).
+2. Delete the stale `~/.config/pnpm/rc` to avoid confusion — pnpm wasn't
+   reading it anyway.
+3. Verify: `pnpm config get minimum-release-age` should return `5760`.
+
 ## [0.1.3] — 2026-04-08
 
 ### Fixed
@@ -82,7 +115,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Native `fetch()` for registry API calls — no HTTP library dependency.
 - 130+ tests across 27 test files.
 
-[Unreleased]: https://github.com/dgilperez/pkg-quarantine/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/dgilperez/pkg-quarantine/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/dgilperez/pkg-quarantine/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/dgilperez/pkg-quarantine/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/dgilperez/pkg-quarantine/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/dgilperez/pkg-quarantine/compare/v0.1.0...v0.1.1

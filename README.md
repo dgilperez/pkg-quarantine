@@ -60,7 +60,7 @@ Checks current config against desired quarantine state. Traffic-light output:
 
 ```
   npm     ✓ configured    min-release-age=4 days
-  pnpm    ✓ configured    minimumReleaseAge=5760 minutes
+  pnpm    ✓ configured    minimum-release-age=5760 minutes
   uv      ✗ missing       add exclude-newer to ~/.config/uv/uv.toml
   pip     ~ wrong value   only-binary not set
 ```
@@ -153,7 +153,7 @@ These managers ship a built-in release-age gate. `init` writes the setting and *
 | Manager | Mechanism | Notes |
 |---------|-----------|-------|
 | **npm** | `min-release-age` in `~/.npmrc` | **Requires npm ≥ 11.10.0** (Feb 2026). Earlier versions silently ignore the setting — `quarantine audit` warns. |
-| **pnpm** | `minimumReleaseAge` (minutes) in pnpm rc | — |
+| **pnpm** | `minimum-release-age` (minutes) in pnpm rc | Config lives at `~/Library/Preferences/pnpm/rc` on macOS, `~/.config/pnpm/rc` on Linux (or `$XDG_CONFIG_HOME/pnpm/rc`). |
 | **bun** | `install.minimumReleaseAge` (seconds) in `bunfig.toml` | — |
 | **uv** | `exclude-newer = "N days"` in `uv.toml` | — |
 | **yarn** | `npmMinimalAgeGate` in `.yarnrc.yml` | Per-project only — `init` prints the snippet to add. |
